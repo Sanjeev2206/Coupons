@@ -120,7 +120,7 @@ accountForm.addEventListener("submit",async event=>{
     if(signup){
       authResult=await supabase.auth.signUp({
         email,password,
-        options:{data:{full_name:document.getElementById("fullName").value.trim()}}
+        options:{data:{full_name:document.getElementById("fullName").value.trim()},emailRedirectTo:"https://sanjeev2206.github.io/Coupons/"}
       });
     }else{
       authResult=await supabase.auth.signInWithPassword({email,password});
