@@ -16,6 +16,8 @@ const accountModal=document.getElementById("accountModal");
 const businessGrid=document.getElementById("businessGrid");
 const searchInput=document.getElementById("searchInput");
 const emptyState=document.getElementById("emptyState");
+const dashboard=document.getElementById("customerDashboard");
+let currentSession=null;
 let activeCategory="All",activeView="all",activeQuiz=null,selectedAnswer=null;
 
 function renderCards(){
@@ -179,6 +181,7 @@ accountForm.addEventListener("submit",async event=>{
     }else{
       accountFeedback.className="account-feedback success";
       accountFeedback.textContent=signup?"Your customer account has been created.":"You're signed in successfully.";
+      if(authResult.data.session){currentSession=authResult.data.session;accountModal.close();await showCustomerDashboard(currentSession);}
     }
   }catch(error){
     accountFeedback.className="account-feedback error";
@@ -197,12 +200,31 @@ document.getElementById("menuToggle").addEventListener("click",()=>document.quer
 document.querySelectorAll(".main-nav a").forEach(link=>link.addEventListener("click",()=>document.querySelector(".main-nav").classList.remove("open")));
 renderCards();
 
-const {data:{session}}=await supabase.auth.getSession();
-if(session){
-  const signInButton=document.getElementById("customerLogin");
-  signInButton.textContent="My account";
-  signInButton.addEventListener("click",()=>openAccount("customer"));
+
+async function showCustomerDashboard(session){
+ if(!session)return; currentSession=session; dashboard.hidden=false;
+ ["hero","trust-strip","discover-section","nearby-band","how-section","business-cta"].forEach(cls=>{const el=document.querySelector("."+cls);if(el)el.hidden=true;});
+ document.getElementById("customerLogin").textContent="My account";
+ document.getElementById("dashboardName").textContent=(session.user.user_metadata?.full_name||session.user.email?.split("@")[0]||"there").split(" ")[0];
+ document.getElementById("profileEmail").value=session.user.email||"";
+ await loadDashboardData(session);window.scrollTo({top:0,behavior:"smooth"});
 }
-supabase.auth.onAuthStateChange((_event,session)=>{
-  document.getElementById("customerLogin").textContent=session?"My account":"Sign in";
-});
+function safeText(value){return String(value??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;");}
+async function loadDashboardData(session){
+ const list=document.getElementById("couponList");list.textContent="Loading your coupons…";
+ const results=await Promise.all([supabase.from("profiles").select("full_name,phone,role").eq("id",session.user.id).maybeSingle(),supabase.from("coupons").select("id,code,reward_type,reward_value,minimum_purchase,issued_at,valid_until,status,businesses(name)").eq("customer_id",session.user.id).order("issued_at",{ascending:false})]);
+ const pr=results[0],cr=results[1],feedback=document.getElementById("profileFeedback");
+ if(pr.error)feedback.textContent="Profile could not load: "+pr.error.message;else{const p=pr.data||{};document.getElementById("profileName").value=p.full_name||session.user.user_metadata?.full_name||"";document.getElementById("profilePhone").value=p.phone||"";if(p.full_name)document.getElementById("dashboardName").textContent=p.full_name.split(" ")[0];}
+ if(cr.error){list.textContent="Could not load coupons: "+cr.error.message;return;}
+ const coupons=cr.data||[],now=Date.now(),active=coupons.filter(x=>x.status==="active"&&new Date(x.valid_until).getTime()>now),redeemed=coupons.filter(x=>x.status==="redeemed"),expired=coupons.filter(x=>x.status==="expired"||(x.status==="active"&&new Date(x.valid_until).getTime()<=now));
+ document.getElementById("availableCount").textContent=active.length;document.getElementById("redeemedCount").textContent=redeemed.length;document.getElementById("expiredCount").textContent=expired.length;
+ if(!coupons.length){list.innerHTML="<div class='coupon-empty'><h3>Your rewards will appear here</h3><p>You have not unlocked a coupon yet. Explore businesses and answer a question to earn your first reward.</p></div>";return;}
+ list.innerHTML=coupons.map(x=>{const exp=x.status==="expired"||(x.status==="active"&&new Date(x.valid_until).getTime()<=now),status=exp?"Expired":x.status==="redeemed"?"Redeemed":x.status==="cancelled"?"Cancelled":"Available",reward=x.reward_type==="percentage"?Number(x.reward_value)+"% off":"₹"+Number(x.reward_value).toLocaleString("en-IN")+" off",business=x.businesses?.name||"Participating business";return "<article class='coupon-row'><div class='coupon-reward'><strong>"+safeText(reward)+"</strong><span>"+safeText(business)+"</span></div><div class='coupon-code'><span>COUPON CODE</span><strong>"+safeText(x.code)+"</strong></div><div class='coupon-meta'><span class='coupon-status "+(exp?"expired":x.status==="redeemed"?"redeemed":"available")+"'>"+status+"</span><span>Valid until "+new Date(x.valid_until).toLocaleDateString("en-IN")+"</span></div></article>";}).join("");
+}
+document.getElementById("refreshCoupons").addEventListener("click",()=>currentSession&&loadDashboardData(currentSession));
+document.getElementById("profileForm").addEventListener("submit",async e=>{e.preventDefault();const b=document.getElementById("saveProfile"),f=document.getElementById("profileFeedback");b.disabled=true;f.textContent="Saving…";try{const {error}=await supabase.rpc("update_my_profile",{p_full_name:document.getElementById("profileName").value.trim()});if(error)throw error;document.getElementById("dashboardName").textContent=document.getElementById("profileName").value.trim().split(" ")[0]||"there";f.className="account-feedback success";f.textContent="Your name has been updated.";}catch(error){f.className="account-feedback error";f.textContent=error.message||"Could not update profile.";}finally{b.disabled=false;}});
+document.getElementById("dashboardSignOut").addEventListener("click",async()=>{const {error}=await supabase.auth.signOut();if(error){alert(error.message);return;}currentSession=null;dashboard.hidden=true;["hero","trust-strip","discover-section","nearby-band","how-section","business-cta"].forEach(cls=>{const el=document.querySelector("."+cls);if(el)el.hidden=false;});document.getElementById("customerLogin").textContent="Sign in";window.scrollTo({top:0,behavior:"smooth"});});
+document.getElementById("dashboardDiscover").addEventListener("click",()=>{dashboard.hidden=true;["hero","trust-strip","discover-section","nearby-band","how-section","business-cta"].forEach(cls=>{const el=document.querySelector("."+cls);if(el)el.hidden=false;});});
+const {data:{session}}=await supabase.auth.getSession();if(session)await showCustomerDashboard(session);
+supabase.auth.onAuthStateChange((event,session)=>{if(event==="SIGNED_OUT"){currentSession=null;dashboard.hidden=true;["hero","trust-strip","discover-section","nearby-band","how-section","business-cta"].forEach(cls=>{const el=document.querySelector("."+cls);if(el)el.hidden=false;});document.getElementById("customerLogin").textContent="Sign in";}});
+
