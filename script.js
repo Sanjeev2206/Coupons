@@ -139,7 +139,7 @@ const accountSubmit=document.getElementById("accountSubmit");
 function updateAccountForm(){
   const signup=accountMode.value==="signup";
   nameField.hidden=!signup;
-  businessFields.hidden=accountRole.value!=="business";
+  businessFields.hidden=!(signup&&accountRole.value==="business");
   document.getElementById("accountHeading").textContent=signup?"Create your Coupons account":"Welcome back";
   document.getElementById("accountIntro").textContent=signup?"Create an account with your email. Mobile OTP will be configured separately.":"Sign in with the email and password you registered with.";
   document.getElementById("fullName").required=signup;
@@ -213,26 +213,25 @@ accountForm.addEventListener("submit",async event=>{
       return;
     }
     if(role==="business"){
-      const businessName=document.getElementById("businessName").value.trim();
-      const businessCategory=document.getElementById("businessCategory").value;
-      if(!businessName||!businessCategory){
+      if(signup){
+        const businessName=document.getElementById("businessName").value.trim();
+        const businessCategory=document.getElementById("businessCategory").value;
+        if(!businessName||!businessCategory)throw new Error("Enter your business name and choose a category.");
+        const {data:businessId,error}=await supabase.rpc("register_business",{
+          p_name:businessName,p_category:businessCategory,p_description:null,
+          p_phone:document.getElementById("businessPhone").value.trim()||null,
+          p_email:email,p_address:document.getElementById("businessAddress").value.trim()||null,
+          p_city:document.getElementById("businessCity").value.trim()||null,
+          p_state:null,p_postal_code:null,p_latitude:null,p_longitude:null
+        });
+        if(error)throw error;
         accountFeedback.className="account-feedback success";
-        accountFeedback.textContent="You're signed in. To submit your business application, create an account as a business owner and complete the business details.";
-        return;
+        accountFeedback.textContent="Business application submitted (ID: "+businessId+"). Sign in with this email and password to view its status.";
+      }else{
+        currentSession=authResult.data.session;
+        await showBusinessDashboard(currentSession);
+        accountModal.close();
       }
-      const {data:businessId,error}=await supabase.rpc("register_business",{
-        p_name:businessName,
-        p_category:businessCategory,
-        p_description:null,
-        p_phone:document.getElementById("businessPhone").value.trim()||null,
-        p_email:email,
-        p_address:document.getElementById("businessAddress").value.trim()||null,
-        p_city:document.getElementById("businessCity").value.trim()||null,
-        p_state:null,p_postal_code:null,p_latitude:null,p_longitude:null
-      });
-      if(error)throw error;
-      accountFeedback.className="account-feedback success";
-      accountFeedback.textContent="Business application submitted. Application ID: "+businessId+". It will remain pending until approved by the platform administrator.";
     }else{
       accountFeedback.className="account-feedback success";
       accountFeedback.textContent=signup?"Your customer account has been created.":"You're signed in successfully.";
@@ -255,6 +254,78 @@ document.getElementById("menuToggle").addEventListener("click",()=>document.quer
 document.querySelectorAll(".main-nav a").forEach(link=>link.addEventListener("click",()=>document.querySelector(".main-nav").classList.remove("open")));
 renderCards();
 
+
+
+let currentBusiness=null;
+async function showBusinessDashboard(session){
+  currentSession=session;
+  dashboard.hidden=true;
+  document.getElementById("businessDashboard").hidden=false;
+  ["hero","trust-strip","discover-section","nearby-band","how-section","business-cta"].forEach(cls=>{const el=document.querySelector("."+cls);if(el)el.hidden=true;});
+  document.getElementById("customerLogin").textContent="Business dashboard";
+  document.getElementById("businessWelcome").textContent="Welcome, "+(session.user.user_metadata?.full_name||session.user.email?.split("@")[0]||"business owner")+".";
+  const {data:businesses,error}=await supabase.from("businesses").select("id,name,status,category,city").eq("owner_id",session.user.id).order("created_at",{ascending:false}).limit(1);
+  if(error)throw error;
+  currentBusiness=businesses?.[0]||null;
+  if(!currentBusiness){
+    document.getElementById("businessStatus").textContent="No business application is linked to this account.";
+    document.getElementById("businessPending").hidden=false;
+    document.getElementById("businessPending").innerHTML="<h2>No business application found</h2><p>Please sign out and register using the Business owner account type.</p>";
+    document.getElementById("businessTools").hidden=true;
+    return;
+  }
+  document.getElementById("businessStatus").textContent=currentBusiness.name+" · "+currentBusiness.category+(currentBusiness.city?" · "+currentBusiness.city:"");
+  const approved=currentBusiness.status==="approved";
+  document.getElementById("businessPending").hidden=approved;
+  document.getElementById("businessTools").hidden=!approved;
+  if(!approved){
+    document.getElementById("businessPending").innerHTML="<h2>Application "+safeText(currentBusiness.status||"pending")+"</h2><p>Your business application for <strong>"+safeText(currentBusiness.name)+"</strong> is saved. An administrator must approve it before you can publish questions or redeem coupons.</p>";
+  }else{
+    await loadBusinessQuestions();
+  }
+}
+async function loadBusinessQuestions(){
+  if(!currentBusiness)return;
+  const box=document.getElementById("businessQuestionList");box.textContent="Loading offers…";
+  const {data,error}=await supabase.from("questions").select("id,prompt,status,reward_type,reward_value,issued_count,max_coupons,ends_at").eq("business_id",currentBusiness.id).order("created_at",{ascending:false});
+  if(error){box.textContent="Could not load offers: "+error.message;return;}
+  if(!data?.length){box.innerHTML="<p class='dashboard-muted'>You have not published a question yet.</p>";return;}
+  box.innerHTML=data.map(q=>"<article class='coupon-row'><div><strong>"+safeText(q.prompt)+"</strong><p>"+(q.reward_type==="percentage"?safeText(q.reward_value)+"% off":"₹"+safeText(q.reward_value)+" off")+" · "+safeText(q.status)+"</p></div><div class='coupon-meta'><span>"+q.issued_count+" / "+q.max_coupons+" claimed</span><span>Ends "+new Date(q.ends_at).toLocaleDateString("en-IN")+"</span></div></article>").join("");
+}
+document.getElementById("businessQuestionForm").addEventListener("submit",async e=>{
+  e.preventDefault();if(!currentBusiness)return;
+  const button=document.getElementById("publishQuestion"),feedback=document.getElementById("businessQuestionFeedback");
+  const options=document.getElementById("businessOptions").value.split("\n").map(x=>x.trim()).filter(Boolean);
+  const endValue=document.getElementById("businessEndDate").value;
+  if(options.length<2||options.length>6){feedback.textContent="Enter between 2 and 6 answer options.";feedback.className="account-feedback error";return;}
+  if(!endValue||new Date(endValue)<=new Date()){feedback.textContent="Choose a future end date and time.";feedback.className="account-feedback error";return;}
+  button.disabled=true;feedback.textContent="Publishing…";
+  try{
+    const {data,error}=await supabase.rpc("create_question",{p_business_id:currentBusiness.id,p_prompt:document.getElementById("businessPrompt").value.trim(),p_options:options,p_correct_answer:document.getElementById("businessCorrect").value.trim(),p_reward_type:document.getElementById("businessRewardType").value,p_reward_value:Number(document.getElementById("businessRewardValue").value),p_minimum_purchase:Number(document.getElementById("businessMinimum").value||0),p_max_coupons:Number(document.getElementById("businessMaxCoupons").value),p_starts_at:new Date().toISOString(),p_ends_at:new Date(endValue).toISOString(),p_coupon_validity_days:Number(document.getElementById("businessValidity").value),p_terms:document.getElementById("businessTerms").value.trim()||null});
+    if(error)throw error;
+    feedback.className="account-feedback success";feedback.textContent="Question published successfully. ID: "+data;
+    e.target.reset();document.getElementById("businessMinimum").value="0";document.getElementById("businessMaxCoupons").value="100";document.getElementById("businessValidity").value="7";
+    await loadBusinessQuestions();await loadLiveOffers();
+  }catch(error){feedback.className="account-feedback error";feedback.textContent=error.message||"Could not publish question.";}
+  finally{button.disabled=false;}
+});
+document.getElementById("businessRedeemForm").addEventListener("submit",async e=>{
+  e.preventDefault();const button=e.target.querySelector("button[type=submit]"),feedback=document.getElementById("redeemFeedback");
+  button.disabled=true;feedback.textContent="Checking coupon…";
+  try{
+    const {data,error}=await supabase.rpc("redeem_coupon",{p_code:document.getElementById("redeemCode").value.trim()});
+    if(error)throw error;const result=Array.isArray(data)?data[0]:data;
+    feedback.className="account-feedback "+(result?.success?"success":"error");feedback.textContent=result?.message||"Could not redeem coupon.";
+    if(result?.success)e.target.reset();
+  }catch(error){feedback.className="account-feedback error";feedback.textContent=error.message||"Could not redeem coupon.";}
+  finally{button.disabled=false;}
+});
+document.getElementById("businessSignOut").addEventListener("click",async()=>{
+  const {error}=await supabase.auth.signOut();if(error){alert(error.message);return;}
+  currentSession=null;currentBusiness=null;document.getElementById("businessDashboard").hidden=true;
+  ["hero","trust-strip","discover-section","nearby-band","how-section","business-cta"].forEach(cls=>{const el=document.querySelector("."+cls);if(el)el.hidden=false;});
+  document.getElementById("customerLogin").textContent="Sign in";window.scrollTo({top:0,behavior:"smooth"});
+});
 
 async function showCustomerDashboard(session){
  if(!session)return; currentSession=session; dashboard.hidden=false;
@@ -281,6 +352,6 @@ document.getElementById("profileForm").addEventListener("submit",async e=>{e.pre
 document.getElementById("dashboardSignOut").addEventListener("click",async()=>{const {error}=await supabase.auth.signOut();if(error){alert(error.message);return;}currentSession=null;dashboard.hidden=true;["hero","trust-strip","discover-section","nearby-band","how-section","business-cta"].forEach(cls=>{const el=document.querySelector("."+cls);if(el)el.hidden=false;});document.getElementById("customerLogin").textContent="Sign in";window.scrollTo({top:0,behavior:"smooth"});});
 document.getElementById("dashboardDiscover").addEventListener("click",()=>{dashboard.hidden=true;["hero","trust-strip","discover-section","nearby-band","how-section","business-cta"].forEach(cls=>{const el=document.querySelector("."+cls);if(el)el.hidden=false;});});
 await loadLiveOffers();
-const {data:{session}}=await supabase.auth.getSession();if(session)await showCustomerDashboard(session);
-supabase.auth.onAuthStateChange((event,session)=>{if(event==="SIGNED_OUT"){currentSession=null;dashboard.hidden=true;["hero","trust-strip","discover-section","nearby-band","how-section","business-cta"].forEach(cls=>{const el=document.querySelector("."+cls);if(el)el.hidden=false;});document.getElementById("customerLogin").textContent="Sign in";}});
+const {data:{session}}=await supabase.auth.getSession();if(session){const {data:profile}=await supabase.from("profiles").select("role").eq("id",session.user.id).maybeSingle();if(profile?.role==="business")await showBusinessDashboard(session);else await showCustomerDashboard(session);}
+supabase.auth.onAuthStateChange((event,session)=>{if(event==="SIGNED_OUT"){currentSession=null;currentBusiness=null;document.getElementById("businessDashboard").hidden=true;dashboard.hidden=true;["hero","trust-strip","discover-section","nearby-band","how-section","business-cta"].forEach(cls=>{const el=document.querySelector("."+cls);if(el)el.hidden=false;});document.getElementById("customerLogin").textContent="Sign in";}});
 
