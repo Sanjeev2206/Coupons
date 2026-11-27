@@ -1,3 +1,9 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const SUPABASE_URL = "https://ankanwyqqaatpwizyiyo.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_Pm-d1pHB55S_sph_uMW-jg_qLvDFuLE";
+const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
 const quizData = {
   coffee:{business:"Bean There Café",question:"Which ingredient gives a cappuccino its coffee flavour?",answers:["Tea leaves","Espresso coffee","Lemon juice","Cocoa butter"],correct:1,reward:"15% off your next coffee"},
   shopping:{business:"The Good Things Store",question:"Which of these is commonly used to wrap a gift?",answers:["Gift paper","Sand","Cooking oil","Soap"],correct:0,reward:"₹100 off purchases above ₹799"},
@@ -6,10 +12,12 @@ const quizData = {
 };
 const quizModal=document.getElementById("quizModal");
 const infoModal=document.getElementById("infoModal");
+const accountModal=document.getElementById("accountModal");
 const businessGrid=document.getElementById("businessGrid");
 const searchInput=document.getElementById("searchInput");
 const emptyState=document.getElementById("emptyState");
 let activeCategory="All",activeView="all",activeQuiz=null,selectedAnswer=null;
+
 function renderCards(){
   let visible=0;
   document.querySelectorAll(".business-card").forEach(card=>{
@@ -49,7 +57,7 @@ document.getElementById("submitAnswer").addEventListener("click",()=>{
   const feedback=document.getElementById("quizFeedback");
   if(selectedAnswer===null){feedback.textContent="Choose an answer first.";feedback.className="quiz-feedback error";return}
   if(selectedAnswer===activeQuiz.correct){
-    feedback.textContent="Correct! You unlocked: "+activeQuiz.reward+". Coupon delivery will be enabled after mobile registration is built.";
+    feedback.textContent="Correct! This is a demo question only. Sign in and live business offers will be connected in the next stage.";
     feedback.className="quiz-feedback success";
     document.getElementById("submitAnswer").disabled=true;
   }else{
@@ -58,17 +66,119 @@ document.getElementById("submitAnswer").addEventListener("click",()=>{
   }
 });
 document.getElementById("closeModal").addEventListener("click",()=>quizModal.close());
+
 function showInfo(title,text){document.getElementById("infoTitle").textContent=title;document.getElementById("infoText").textContent=text;infoModal.showModal()}
-document.getElementById("customerLogin").addEventListener("click",()=>showInfo("Customer sign-in","Mobile number registration, OTP verification and your personal coupon wallet will be added in the account stage."));
-document.getElementById("businessLogin").addEventListener("click",()=>showInfo("Business registration","Business profiles, question creation, offer settings and coupon management will be added in the business dashboard stage."));
-document.getElementById("businessCta").addEventListener("click",()=>showInfo("List your business","The business registration form and secure business dashboard are planned for the next development stage."));
 document.getElementById("closeInfo").addEventListener("click",()=>infoModal.close());
 document.getElementById("infoOk").addEventListener("click",()=>infoModal.close());
+
+const accountForm=document.getElementById("accountForm");
+const accountMode=document.getElementById("accountMode");
+const accountRole=document.getElementById("accountRole");
+const nameField=document.getElementById("nameField");
+const businessFields=document.getElementById("businessFields");
+const accountFeedback=document.getElementById("accountFeedback");
+const accountSubmit=document.getElementById("accountSubmit");
+
+function updateAccountForm(){
+  const signup=accountMode.value==="signup";
+  nameField.hidden=!signup;
+  businessFields.hidden=accountRole.value!=="business";
+  document.getElementById("accountHeading").textContent=signup?"Create your Coupons account":"Welcome back";
+  document.getElementById("accountIntro").textContent=signup?"Create an account with your email. Mobile OTP will be configured separately.":"Sign in with the email and password you registered with.";
+  document.getElementById("fullName").required=signup;
+  document.getElementById("businessName").required=signup&&accountRole.value==="business";
+  document.getElementById("businessCategory").required=signup&&accountRole.value==="business";
+  document.getElementById("accountPassword").autocomplete=signup?"new-password":"current-password";
+  accountSubmit.textContent=signup?"Create account":"Sign in";
+  accountFeedback.textContent="";
+}
+accountMode.addEventListener("change",updateAccountForm);
+accountRole.addEventListener("change",updateAccountForm);
+
+function openAccount(role="customer"){
+  accountRole.value=role;
+  accountMode.value="signin";
+  updateAccountForm();
+  accountModal.showModal();
+}
+document.getElementById("customerLogin").addEventListener("click",()=>openAccount("customer"));
+document.getElementById("businessLogin").addEventListener("click",()=>openAccount("business"));
+document.getElementById("businessCta").addEventListener("click",()=>openAccount("business"));
+document.getElementById("closeAccount").addEventListener("click",()=>accountModal.close());
+
+accountForm.addEventListener("submit",async event=>{
+  event.preventDefault();
+  accountSubmit.disabled=true;
+  accountFeedback.className="account-feedback";
+  accountFeedback.textContent="Please wait…";
+  const email=document.getElementById("accountEmail").value.trim();
+  const password=document.getElementById("accountPassword").value;
+  const signup=accountMode.value==="signup";
+  const role=accountRole.value;
+  try{
+    let authResult;
+    if(signup){
+      authResult=await supabase.auth.signUp({
+        email,password,
+        options:{data:{full_name:document.getElementById("fullName").value.trim()}}
+      });
+    }else{
+      authResult=await supabase.auth.signInWithPassword({email,password});
+    }
+    if(authResult.error)throw authResult.error;
+    if(signup&&!authResult.data.session){
+      accountFeedback.className="account-feedback success";
+      accountFeedback.textContent="Account request received. Check your email for a confirmation link, then return here and sign in. For business registration, choose Business owner when signing in.";
+      return;
+    }
+    if(role==="business"){
+      const businessName=document.getElementById("businessName").value.trim();
+      const businessCategory=document.getElementById("businessCategory").value;
+      if(!businessName||!businessCategory){
+        accountFeedback.className="account-feedback success";
+        accountFeedback.textContent="You're signed in. To submit your business application, create an account as a business owner and complete the business details.";
+        return;
+      }
+      const {data:businessId,error}=await supabase.rpc("register_business",{
+        p_name:businessName,
+        p_category:businessCategory,
+        p_description:null,
+        p_phone:document.getElementById("businessPhone").value.trim()||null,
+        p_email:email,
+        p_address:document.getElementById("businessAddress").value.trim()||null,
+        p_city:document.getElementById("businessCity").value.trim()||null,
+        p_state:null,p_postal_code:null,p_latitude:null,p_longitude:null
+      });
+      if(error)throw error;
+      accountFeedback.className="account-feedback success";
+      accountFeedback.textContent="Business application submitted. Application ID: "+businessId+". It will remain pending until approved by the platform administrator.";
+    }else{
+      accountFeedback.className="account-feedback success";
+      accountFeedback.textContent=signup?"Your customer account has been created.":"You're signed in successfully.";
+    }
+  }catch(error){
+    accountFeedback.className="account-feedback error";
+    accountFeedback.textContent=error.message||"Something went wrong. Please try again.";
+  }finally{
+    accountSubmit.disabled=false;
+  }
+});
+
 document.getElementById("locationButton").addEventListener("click",()=>{
   const message=document.getElementById("locationMessage");
   if(!("geolocation" in navigator)){message.textContent="Your browser does not support location sharing. You can still browse all offers.";return}
-  message.textContent="Location access is not connected yet. Nearby listings currently use demo distances.";
+  message.textContent="Nearby search will use your location after live business discovery is connected.";
 });
 document.getElementById("menuToggle").addEventListener("click",()=>document.querySelector(".main-nav").classList.toggle("open"));
 document.querySelectorAll(".main-nav a").forEach(link=>link.addEventListener("click",()=>document.querySelector(".main-nav").classList.remove("open")));
 renderCards();
+
+const {data:{session}}=await supabase.auth.getSession();
+if(session){
+  const signInButton=document.getElementById("customerLogin");
+  signInButton.textContent="My account";
+  signInButton.addEventListener("click",()=>openAccount("customer"));
+}
+supabase.auth.onAuthStateChange((_event,session)=>{
+  document.getElementById("customerLogin").textContent=session?"My account":"Sign in";
+});
