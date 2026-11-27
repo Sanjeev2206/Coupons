@@ -164,7 +164,7 @@ begin
   if jsonb_typeof(p_options) <> 'array' or jsonb_array_length(p_options) not between 2 and 6 then
     raise exception 'Provide between 2 and 6 answer options';
   end if;
-  if not exists(select 1 from jsonb_array_elements_text(p_options) option_text where lower(trim(option_text))=lower(trim(p_correct_answer))) then
+  if not exists(select 1 from jsonb_array_elements_text(p_options) as option_rows(option_text) where lower(trim(option_rows.option_text))=lower(trim(p_correct_answer))) then
     raise exception 'Correct answer must match one of the options';
   end if;
   if p_ends_at <= p_starts_at then raise exception 'End date must be after start date'; end if;
