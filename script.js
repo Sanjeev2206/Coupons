@@ -103,7 +103,7 @@ function openAccount(role="customer"){
   updateAccountForm();
   accountModal.showModal();
 }
-document.getElementById("customerLogin").addEventListener("click",()=>openAccount("customer"));
+document.getElementById("customerLogin").addEventListener("click",()=>currentSession?showCustomerDashboard(currentSession):openAccount("customer"));
 document.getElementById("businessLogin").addEventListener("click",()=>openAccount("business"));
 document.getElementById("businessCta").addEventListener("click",()=>openAccount("business"));
 document.getElementById("closeAccount").addEventListener("click",()=>accountModal.close());
