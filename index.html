@@ -41,6 +41,33 @@
       </div>
       <div class="dashboard-bottom"><div><h2>Discover more rewards</h2><p>Browse businesses and answer questions to earn coupons.</p></div><a class="btn btn-primary" href="#discover" id="dashboardDiscover">Explore businesses →</a></div>
     </section>
+    <section class="business-dashboard section" id="businessDashboard" hidden>
+      <div class="dashboard-heading"><div><div class="eyebrow">BUSINESS OWNER ACCOUNT</div><h1 id="businessWelcome">Business dashboard</h1><p id="businessStatus">Your business listing and offers.</p></div><button class="btn btn-dark" id="businessSignOut">Sign out</button></div>
+      <div class="dashboard-panel" id="businessPending" hidden><h2>Application under review</h2><p>Your business has been registered. The Coupons team must approve it before you can publish questions or issue coupons.</p></div>
+      <div id="businessTools" hidden>
+        <div class="dashboard-columns">
+          <section class="dashboard-panel"><div class="eyebrow">CREATE AN OFFER</div><h2>Publish a question</h2>
+            <form id="businessQuestionForm">
+              <label class="account-label" for="businessPrompt">Question</label><input class="account-control" id="businessPrompt" required minlength="5" maxlength="500" placeholder="Ask a simple question">
+              <label class="account-label" for="businessOptions">Answer options (one per line)</label><textarea class="account-control" id="businessOptions" required rows="4" placeholder="Option A&#10;Option B&#10;Option C"></textarea>
+              <label class="account-label" for="businessCorrect">Correct answer (must match an option)</label><input class="account-control" id="businessCorrect" required>
+              <label class="account-label" for="businessRewardType">Discount type</label><select class="account-control" id="businessRewardType"><option value="percentage">Percentage (%)</option><option value="fixed">Fixed amount (₹)</option></select>
+              <label class="account-label" for="businessRewardValue">Discount value</label><input class="account-control" id="businessRewardValue" type="number" min="1" step="0.01" required>
+              <label class="account-label" for="businessMinimum">Minimum purchase (₹)</label><input class="account-control" id="businessMinimum" type="number" min="0" step="0.01" value="0">
+              <label class="account-label" for="businessMaxCoupons">Maximum coupons</label><input class="account-control" id="businessMaxCoupons" type="number" min="1" max="100000" value="100" required>
+              <label class="account-label" for="businessEndDate">Offer ends</label><input class="account-control" id="businessEndDate" type="datetime-local" required>
+              <label class="account-label" for="businessValidity">Coupon validity (days after issue)</label><input class="account-control" id="businessValidity" type="number" min="1" max="365" value="7" required>
+              <label class="account-label" for="businessTerms">Terms (optional)</label><textarea class="account-control" id="businessTerms" rows="2"></textarea>
+              <button class="btn btn-primary account-submit" type="submit" id="publishQuestion">Publish question</button><p class="account-feedback" id="businessQuestionFeedback" role="status"></p>
+            </form>
+          </section>
+          <section class="dashboard-panel"><div class="eyebrow">YOUR OFFERS</div><h2>Published questions</h2><div id="businessQuestionList"><p class="dashboard-muted">Loading offers…</p></div>
+            <div class="account-divider"></div><div class="eyebrow">REDEEM A COUPON</div><h2>Validate customer coupon</h2>
+            <form id="businessRedeemForm"><label class="account-label" for="redeemCode">Coupon code</label><input class="account-control" id="redeemCode" required placeholder="Enter customer coupon code"><button class="btn btn-primary" type="submit">Redeem coupon</button><p class="account-feedback" id="redeemFeedback" role="status"></p></form>
+          </section>
+        </div>
+      </div>
+    </section>
     <section class="hero">
       <div class="hero-copy">
         <div class="eyebrow"><span class="eyebrow-dot"></span> A smarter way to save locally</div>
