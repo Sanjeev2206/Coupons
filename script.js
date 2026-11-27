@@ -106,6 +106,30 @@ document.getElementById("businessLogin").addEventListener("click",()=>openAccoun
 document.getElementById("businessCta").addEventListener("click",()=>openAccount("business"));
 document.getElementById("closeAccount").addEventListener("click",()=>accountModal.close());
 
+document.getElementById("resendConfirmation").addEventListener("click",async()=>{
+  const email=document.getElementById("accountEmail").value.trim();
+  if(!email){accountFeedback.className="account-feedback error";accountFeedback.textContent="Enter your email address first.";return}
+  const resendButton=document.getElementById("resendConfirmation");
+  resendButton.disabled=true;
+  accountFeedback.className="account-feedback";
+  accountFeedback.textContent="Sending a fresh confirmation email…";
+  try{
+    const {error}=await supabase.auth.resend({
+      type:"signup",
+      email,
+      options:{emailRedirectTo:"https://sanjeev2206.github.io/Coupons/"}
+    });
+    if(error)throw error;
+    accountFeedback.className="account-feedback success";
+    accountFeedback.textContent="A new confirmation email has been requested. Use only the newest email and ignore older confirmation links.";
+  }catch(error){
+    accountFeedback.className="account-feedback error";
+    accountFeedback.textContent=error.message||"Could not resend the confirmation email. Check the email address and try again.";
+  }finally{
+    resendButton.disabled=false;
+  }
+});
+
 accountForm.addEventListener("submit",async event=>{
   event.preventDefault();
   accountSubmit.disabled=true;
