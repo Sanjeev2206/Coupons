@@ -19,6 +19,30 @@ const emptyState=document.getElementById("emptyState");
 const dashboard=document.getElementById("customerDashboard");
 let currentSession=null;
 let activeCategory="All",activeView="all",activeQuiz=null,selectedAnswer=null;
+const liveQuestions=new Map();
+
+
+async function loadLiveOffers(){
+  const {data,error}=await supabase.from("questions").select("id,prompt,options,reward_type,reward_value,minimum_purchase,ends_at,business_id,businesses(name,category,city)").eq("status","published").lte("starts_at",new Date().toISOString()).gt("ends_at",new Date().toISOString()).order("created_at",{ascending:false});
+  if(error){console.warn("Live offers could not be loaded:",error.message);return;}
+  const existing=new Set(Array.from(businessGrid.querySelectorAll(".business-card")).map(card=>card.dataset.businessId).filter(Boolean));
+  (data||[]).forEach(question=>{
+    const business=question.businesses;
+    if(!business)return;
+    const key=question.id;
+    liveQuestions.set(key,{questionId:key,business:business.name,question:question.prompt,answers:Array.isArray(question.options)?question.options:[],reward:question.reward_type==="percentage"?Number(question.reward_value)+"% off": "₹"+Number(question.reward_value).toLocaleString("en-IN")+" off"});
+    if(existing.has(business.name+"-"+key))return;
+    const category=business.category||"Other";
+    const safe=value=>String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
+    const card=document.createElement("article");
+    card.className="business-card live-business-card";
+    card.dataset.category=category;card.dataset.view="all";card.dataset.search=(business.name+" "+category+" "+(business.city||"")).toLowerCase();card.dataset.businessId=business.name+"-"+key;
+    const reward=question.reward_type==="percentage"?Number(question.reward_value)+"% OFF":"₹"+Number(question.reward_value).toLocaleString("en-IN")+" OFF";
+    card.innerHTML='<div class="card-image live-image"><span class="category-tag">'+safe(category.toUpperCase())+'</span><span class="distance">'+safe(business.city||"Local offer")+'</span><div class="image-emoji">✦</div></div><div class="card-content"><div class="business-title"><div><h3>'+safe(business.name)+'</h3><p>Verified offer from a participating business</p></div></div><div class="offer-line"><strong>'+safe(reward)+'</strong><span>'+(question.reward_type==="percentage"?"discount":"savings")+'</span></div><div class="question-line"><span>✦</span> Answer a question to unlock</div><button class="btn btn-card quiz-trigger" data-question-id="'+safe(key)+'">Answer &amp; unlock <span>→</span></button></div>';
+    businessGrid.appendChild(card);
+  });
+  renderCards();
+}
 
 function renderCards(){
   let visible=0;
@@ -45,7 +69,14 @@ document.querySelectorAll(".tab").forEach(button=>button.addEventListener("click
 searchInput.addEventListener("input",renderCards);
 businessGrid.addEventListener("click",e=>{
   const button=e.target.closest(".quiz-trigger");if(!button)return;
-  activeQuiz=quizData[button.dataset.quiz];selectedAnswer=null;
+  if(button.dataset.questionId){
+    activeQuiz=liveQuestions.get(button.dataset.questionId);
+    if(!activeQuiz)return;
+  }else{
+    activeQuiz=quizData[button.dataset.quiz];
+    if(!activeQuiz)return;
+  }
+  selectedAnswer=null;
   document.getElementById("modalBusiness").textContent=activeQuiz.business;
   document.getElementById("quizQuestion").textContent=activeQuiz.question;
   document.getElementById("answerOptions").innerHTML=activeQuiz.answers.map((answer,index)=>'<label class="answer-option"><input type="radio" name="quizAnswer" value="'+index+'"><span>'+answer+'</span></label>').join("");
@@ -55,16 +86,40 @@ businessGrid.addEventListener("click",e=>{
   quizModal.showModal();
 });
 document.getElementById("answerOptions").addEventListener("change",e=>{if(e.target.name==="quizAnswer")selectedAnswer=Number(e.target.value)});
-document.getElementById("submitAnswer").addEventListener("click",()=>{
+document.getElementById("submitAnswer").addEventListener("click",async()=>{
   const feedback=document.getElementById("quizFeedback");
-  if(selectedAnswer===null){feedback.textContent="Choose an answer first.";feedback.className="quiz-feedback error";return}
+  const submit=document.getElementById("submitAnswer");
+  if(selectedAnswer===null){feedback.textContent="Choose an answer first.";feedback.className="quiz-feedback error";return;}
+  if(activeQuiz.questionId){
+    if(!currentSession){
+      quizModal.close();openAccount("customer");
+      accountFeedback.textContent="Sign in to submit your answer and receive your coupon.";
+      return;
+    }
+    submit.disabled=true;feedback.className="quiz-feedback";feedback.textContent="Checking your answer…";
+    try{
+      const answer=activeQuiz.answers[selectedAnswer];
+      const {data,error}=await supabase.rpc("submit_answer",{p_question_id:activeQuiz.questionId,p_answer:answer});
+      if(error)throw error;
+      const result=Array.isArray(data)?data[0]:data;
+      if(result?.is_correct){
+        feedback.className="quiz-feedback success";
+        feedback.textContent="Correct! Your coupon "+result.coupon_code+" is ready. Valid until "+new Date(result.coupon_valid_until).toLocaleString("en-IN")+". It is saved in My account.";
+        if(currentSession)await loadDashboardData(currentSession);
+      }else{
+        feedback.className="quiz-feedback error";feedback.textContent=result?.message||"That answer is not correct. Please try again.";
+        submit.disabled=false;
+      }
+    }catch(error){
+      feedback.className="quiz-feedback error";feedback.textContent=error.message||"We could not check your answer. Please try again.";submit.disabled=false;
+    }
+    return;
+  }
   if(selectedAnswer===activeQuiz.correct){
-    feedback.textContent="Correct! This is a demo question only. Sign in and live business offers will be connected in the next stage.";
-    feedback.className="quiz-feedback success";
-    document.getElementById("submitAnswer").disabled=true;
+    feedback.textContent="This is a preview question. Live coupons are issued only for questions published by approved businesses.";
+    feedback.className="quiz-feedback success";submit.disabled=true;
   }else{
-    feedback.textContent="Not quite. Please try again.";
-    feedback.className="quiz-feedback error";
+    feedback.textContent="Not quite. Please try again.";feedback.className="quiz-feedback error";
   }
 });
 document.getElementById("closeModal").addEventListener("click",()=>quizModal.close());
@@ -225,6 +280,7 @@ document.getElementById("refreshCoupons").addEventListener("click",()=>currentSe
 document.getElementById("profileForm").addEventListener("submit",async e=>{e.preventDefault();const b=document.getElementById("saveProfile"),f=document.getElementById("profileFeedback");b.disabled=true;f.textContent="Saving…";try{const {error}=await supabase.rpc("update_my_profile",{p_full_name:document.getElementById("profileName").value.trim()});if(error)throw error;document.getElementById("dashboardName").textContent=document.getElementById("profileName").value.trim().split(" ")[0]||"there";f.className="account-feedback success";f.textContent="Your name has been updated.";}catch(error){f.className="account-feedback error";f.textContent=error.message||"Could not update profile.";}finally{b.disabled=false;}});
 document.getElementById("dashboardSignOut").addEventListener("click",async()=>{const {error}=await supabase.auth.signOut();if(error){alert(error.message);return;}currentSession=null;dashboard.hidden=true;["hero","trust-strip","discover-section","nearby-band","how-section","business-cta"].forEach(cls=>{const el=document.querySelector("."+cls);if(el)el.hidden=false;});document.getElementById("customerLogin").textContent="Sign in";window.scrollTo({top:0,behavior:"smooth"});});
 document.getElementById("dashboardDiscover").addEventListener("click",()=>{dashboard.hidden=true;["hero","trust-strip","discover-section","nearby-band","how-section","business-cta"].forEach(cls=>{const el=document.querySelector("."+cls);if(el)el.hidden=false;});});
+await loadLiveOffers();
 const {data:{session}}=await supabase.auth.getSession();if(session)await showCustomerDashboard(session);
 supabase.auth.onAuthStateChange((event,session)=>{if(event==="SIGNED_OUT"){currentSession=null;dashboard.hidden=true;["hero","trust-strip","discover-section","nearby-band","how-section","business-cta"].forEach(cls=>{const el=document.querySelector("."+cls);if(el)el.hidden=false;});document.getElementById("customerLogin").textContent="Sign in";}});
 
