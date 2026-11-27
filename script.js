@@ -195,7 +195,7 @@ accountForm.addEventListener("submit",async event=>{
   const email=document.getElementById("accountEmail").value.trim();
   const password=document.getElementById("accountPassword").value;
   const signup=accountMode.value==="signup";
-  const role=accountRole.value;
+  let role=accountRole.value;
   try{
     let authResult;
     if(signup){
@@ -207,6 +207,7 @@ accountForm.addEventListener("submit",async event=>{
       authResult=await supabase.auth.signInWithPassword({email,password});
     }
     if(authResult.error)throw authResult.error;
+    if(!signup){const {data:accountProfile}=await supabase.from("profiles").select("role").eq("id",authResult.data.user.id).maybeSingle();if(accountProfile?.role)role=accountProfile.role;}
     if(signup&&!authResult.data.session){
       accountFeedback.className="account-feedback success";
       accountFeedback.textContent="Account request received. Check your email for a confirmation link, then return here and sign in. For business registration, choose Business owner when signing in.";
