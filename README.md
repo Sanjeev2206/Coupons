@@ -2,48 +2,48 @@
 
 **Answer. Unlock. Enjoy.**
 
-Coupons is a question-based customer rewards platform connecting local businesses with customers. Businesses publish simple questions and offer discounts; customers answer correctly to unlock coupons.
+Coupons connects businesses and customers through simple sponsored questions and discount coupons.
 
-## Current milestone: Frontend foundation
+## Current implementation
 
-The current version is a responsive, static frontend prototype built with HTML, CSS and vanilla JavaScript.
+- Responsive discovery homepage with category filters and a nearby-business presentation
+- Supabase JS client connected using the project's public publishable key
+- Email/password customer account creation and sign-in
+- Business-owner account flow with business application submission through the `register_business` database function
+- Business applications are pending until approved by a trusted administrator
+- Existing sample cards and quizzes are demonstration content only; live offer discovery and coupon claims are not yet wired to the UI
 
-### Included
-- Homepage and responsive mobile layout
-- All-business discovery and nearby-business view
-- Category filters and business search
-- Sample business offer cards
-- Interactive sample questions and answer feedback
-- Business/customer entry points (informational placeholders)
+## Supabase configuration
 
-### Demo limitations
-- Business names, distances, ratings and offers are sample data.
-- No real user accounts, mobile OTP, database, SMS, coupon issuance or redemption is connected yet.
-- The nearby section is a visual/demo view; it does not currently use device location.
+The browser client uses the Supabase project URL and **publishable** key in `script.js`. A publishable key is designed for browser use when Row Level Security is enabled. Never place a Supabase secret/service-role key or database password in frontend code or GitHub.
 
-## Run locally
+The database schema is in `supabase/schema.sql`. It creates profiles, businesses, questions, private answer keys, answer attempts and coupons, along with RLS policies and database functions.
 
-Open `index.html` in a browser, or use a local static server.
+### Required Supabase Auth URL settings
 
-## Deploy with GitHub Pages
+In Supabase, open **Authentication → URL Configuration** and set:
 
-1. Open repository **Settings → Pages**.
-2. Choose **Deploy from a branch**.
-3. Select branch **main** and folder **/ (root)**.
-4. Save and wait for the deployment URL.
+- Site URL: `https://sanjeev2206.github.io/Coupons/`
+- Add this redirect URL: `https://sanjeev2206.github.io/Coupons/**`
 
-## Planned roadmap
+Email confirmation settings determine whether a new user must verify their email before a session is created.
 
-1. Supabase project, schema and secure access policies
-2. Business registration and business dashboard
-3. Customer mobile registration and OTP verification
-4. Question publishing, answer validation and coupon issuance
-5. Unique coupon codes / QR codes and redemption workflow
-6. SMS delivery, abuse prevention, testing and launch
+## Test the account flow
 
-## Suggested initial stack
+1. Open `https://sanjeev2206.github.io/Coupons/` after GitHub Pages finishes deploying.
+2. Click **Sign in** and choose **Create an account**.
+3. Create a customer account using an email address you control.
+4. If email confirmation is enabled, confirm the email and return to sign in.
+5. For a business application, choose **For businesses**, create/sign into a business-owner account, and complete the business details. The application should be pending until approved.
 
-- Frontend: HTML/CSS/JavaScript prototype (can migrate to Vue)
-- Database and backend: Supabase
-- Hosting: GitHub Pages, Cloudflare Pages or Vercel
-- OTP/SMS: a compliant SMS provider (may incur charges)
+## Not yet implemented
+
+- Mobile number OTP and SMS delivery (requires an SMS provider and Supabase Auth configuration)
+- Live business/question discovery from Supabase
+- Server-validated live question-answer UI and customer coupon wallet
+- Business question management dashboard
+- Coupon QR display and redemption UI
+- Admin approval dashboard and admin role provisioning
+- Production testing and abuse/rate-limit controls
+
+Do not treat the static demo questions or sample business cards as real offers or issued coupons.
