@@ -137,6 +137,46 @@
     <p id="infoText">Mobile number registration and OTP verification will be connected when the secure account system is built.</p>
     <button class="btn btn-primary" id="infoOk">Got it</button>
   </dialog>
-  <script src="script.js"></script>
+  <dialog class="modal account-modal" id="accountModal">
+    <button class="modal-close" id="closeAccount" aria-label="Close">×</button>
+    <div class="eyebrow">YOUR COUPONS ACCOUNT</div>
+    <h2 id="accountHeading">Sign in or create an account</h2>
+    <p class="account-intro" id="accountIntro">Use your email to get started. Mobile OTP will be added after SMS configuration.</p>
+    <form id="accountForm">
+      <label class="account-label" for="accountMode">I want to</label>
+      <select id="accountMode" class="account-control">
+        <option value="signin">Sign in</option>
+        <option value="signup">Create an account</option>
+      </select>
+      <label class="account-label" for="accountRole">Account type</label>
+      <select id="accountRole" class="account-control">
+        <option value="customer">Customer</option>
+        <option value="business">Business owner</option>
+      </select>
+      <div id="nameField" hidden><label class="account-label" for="fullName">Full name</label><input class="account-control" id="fullName" autocomplete="name" placeholder="Your full name"></div>
+      <label class="account-label" for="accountEmail">Email address</label>
+      <input class="account-control" id="accountEmail" type="email" autocomplete="email" required placeholder="you@example.com">
+      <label class="account-label" for="accountPassword">Password</label>
+      <input class="account-control" id="accountPassword" type="password" autocomplete="current-password" minlength="8" required placeholder="At least 8 characters">
+      <div id="businessFields" hidden>
+        <div class="account-divider"></div>
+        <strong class="business-form-heading">Business details</strong>
+        <label class="account-label" for="businessName">Business name</label>
+        <input class="account-control" id="businessName" placeholder="Your business name">
+        <label class="account-label" for="businessCategory">Category</label>
+        <select class="account-control" id="businessCategory"><option value="">Choose a category</option><option>Food &amp; Drink</option><option>Shopping</option><option>Beauty</option><option>Services</option><option>Other</option></select>
+        <label class="account-label" for="businessPhone">Business phone</label>
+        <input class="account-control" id="businessPhone" type="tel" placeholder="Business contact number">
+        <label class="account-label" for="businessAddress">Address</label>
+        <input class="account-control" id="businessAddress" placeholder="Street / locality">
+        <label class="account-label" for="businessCity">City</label>
+        <input class="account-control" id="businessCity" placeholder="City">
+      </div>
+      <button class="btn btn-primary account-submit" id="accountSubmit" type="submit">Continue <span>→</span></button>
+      <p class="account-feedback" id="accountFeedback" role="status" aria-live="polite"></p>
+    </form>
+    <p class="modal-footnote">Your details are handled by Supabase authentication. New business listings require approval before offers can be published.</p>
+  </dialog>
+  <script type="module" src="script.js"></script>
 </body>
 </html>
