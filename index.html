@@ -27,6 +27,20 @@
   </header>
 
   <main>
+
+    <section class="customer-dashboard section" id="customerDashboard" hidden>
+      <div class="dashboard-heading"><div><div class="eyebrow">YOUR COUPONS ACCOUNT</div><h1>Welcome, <span id="dashboardName">there</span>.</h1><p>Your rewards and account details.</p></div><button class="btn btn-dark" id="dashboardSignOut">Sign out</button></div>
+      <div class="dashboard-stats">
+        <article class="dashboard-stat"><span>AVAILABLE COUPONS</span><strong id="availableCount">0</strong></article>
+        <article class="dashboard-stat"><span>REDEEMED</span><strong id="redeemedCount">0</strong></article>
+        <article class="dashboard-stat"><span>EXPIRED</span><strong id="expiredCount">0</strong></article>
+      </div>
+      <div class="dashboard-columns">
+        <section class="dashboard-panel"><div class="dashboard-panel-heading"><div><div class="eyebrow">YOUR REWARDS</div><h2>My coupons</h2></div><button class="text-link" id="refreshCoupons">Refresh ↻</button></div><div class="coupon-list" id="couponList"><p class="dashboard-muted">Loading your coupons…</p></div></section>
+        <section class="dashboard-panel profile-panel"><div class="eyebrow">ACCOUNT DETAILS</div><h2>My profile</h2><form id="profileForm"><label class="account-label" for="profileName">Full name</label><input class="account-control" id="profileName" maxlength="100" required><label class="account-label" for="profileEmail">Email address</label><input class="account-control" id="profileEmail" type="email" disabled><label class="account-label" for="profilePhone">Mobile number</label><input class="account-control" id="profilePhone" type="tel" placeholder="Mobile verification will be enabled later" disabled><p class="dashboard-muted">Mobile verification and SMS coupon delivery will be added after SMS provider setup.</p><button class="btn btn-primary" type="submit" id="saveProfile">Save name</button><p class="account-feedback" id="profileFeedback" role="status"></p></form></section>
+      </div>
+      <div class="dashboard-bottom"><div><h2>Discover more rewards</h2><p>Browse businesses and answer questions to earn coupons.</p></div><a class="btn btn-primary" href="#discover" id="dashboardDiscover">Explore businesses →</a></div>
+    </section>
     <section class="hero">
       <div class="hero-copy">
         <div class="eyebrow"><span class="eyebrow-dot"></span> A smarter way to save locally</div>
@@ -178,6 +192,6 @@
     </form>
     <p class="modal-footnote">Your details are handled by Supabase authentication. New business listings require approval before offers can be published.</p>
   </dialog>
-  <script type="module" src="script.js?v=20261127-2"></script>
+  <script type="module" src="script.js?v=20261127-3"></script>
 </body>
 </html>
