@@ -265,9 +265,9 @@ async function showBusinessDashboard(session){
   ["hero","trust-strip","discover-section","nearby-band","how-section","business-cta"].forEach(cls=>{const el=document.querySelector("."+cls);if(el)el.hidden=true;});
   document.getElementById("customerLogin").textContent="Business dashboard";
   document.getElementById("businessWelcome").textContent="Welcome, "+(session.user.user_metadata?.full_name||session.user.email?.split("@")[0]||"business owner")+".";
-  const {data:businesses,error}=await supabase.from("businesses").select("id,name,status,category,city").eq("owner_id",session.user.id).order("created_at",{ascending:false}).limit(1);
+  const {data:businesses,error}=await supabase.from("businesses").select("id,name,status,category,city,created_at").eq("owner_id",session.user.id).order("created_at",{ascending:false});
   if(error)throw error;
-  currentBusiness=businesses?.[0]||null;
+  currentBusiness=(businesses||[]).find(item=>item.status==="approved")||(businesses||[])[0]||null;
   if(!currentBusiness){
     document.getElementById("businessStatus").textContent="No business application is linked to this account.";
     document.getElementById("businessPending").hidden=false;
